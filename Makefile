@@ -7,7 +7,7 @@ CFLAGS = -std=c23 \
 AR = ar rcu
 RANLIB = ranlib
 RM = rm -f
-LIBS = -fsanitize=address -lreadline
+LIBS = -fsanitize=address
 
 LUA_A = liblua.a
 CORE_O = api.o codegen.o debug.o stack.o dump.o closure.o gc.o lexer.o \
