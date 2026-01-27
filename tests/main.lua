@@ -103,13 +103,12 @@ print(prog)
 RUN([[lua -e"_PROMPT='' _PROMPT2=''" -i < %s > %s]], prog, out)
 checkout("b\nc\nd\ne\n\n")
 
--- FIXME(anqur): This fails and it seems expected.
---prompt = "alo"
---prepfile[[ --
---a = 2
---]]
---RUN([[lua "-e_PROMPT='%s'" -i < %s > %s]], prompt, prog, out)
---checkout(string.rep(prompt, 3).."\n")
+prompt = "alo"
+prepfile[[ --
+a = 2
+]]
+RUN([[lua "-e_PROMPT='%s'" -i < %s > %s]], prompt, prog, out)
+checkout(string.rep(prompt, 3).."\n")
 
 s = [=[ -- 
 function f ( x ) 
