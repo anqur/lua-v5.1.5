@@ -1,4 +1,4 @@
-# Lua<sub>v5.1.5</sub>
+# 🌙 Lua<sub>(v5.1.5)</sub>
 
 This Lua `v5.1.5` fork is my personal attempt to make it much more readable for educational purposes.
 
