@@ -30,10 +30,10 @@ typedef enum {
 #define GLOBAL_FAST_TM(g, et, e)                                               \
   ((et) == nullptr               ? nullptr                                     \
    : ((et)->flags & (1u << (e))) ? nullptr                                     \
-                                 : luaT_gettm(et, e, (g)->tmname[e]))
+                                 : Tag_getTM(et, e, (g)->tmname[e]))
 
 #define FAST_TM(l, et, e) GLOBAL_FAST_TM(G(l), et, e)
 
-LUAI_FUNC const Value *luaT_gettm(Table *events, TMS event, String *ename);
-LUAI_FUNC const Value *luaT_gettmbyobj(lua_State *L, const Value *o, TMS event);
-LUAI_FUNC void luaT_init(lua_State *L);
+LUAI_FUNC const Value *Tag_getTM(Table *events, TMS event, String *ename);
+LUAI_FUNC const Value *Tag_getTMByObj(lua_State *L, const Value *o, TMS event);
+LUAI_FUNC void Tag_init(lua_State *L);

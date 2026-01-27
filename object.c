@@ -21,7 +21,7 @@ const Value valueNil = {{nullptr}, LUA_TYPE_NIL};
 ** (eeeeexxx), where the real value is (1xxx) * 2^(eeeee - 1) if
 ** eeeee != 0 and (xxx) otherwise.
 */
-int luaO_int2fb(unsigned int x) {
+int Object_int2fb(unsigned int x) {
   int e = 0; /* expoent */
   while (x >= 16) {
     x = (x + 1) >> 1;
@@ -35,7 +35,7 @@ int luaO_int2fb(unsigned int x) {
 }
 
 /* converts back */
-int luaO_fb2int(int x) {
+int Object_fb2int(int x) {
   int e = (x >> 3) & 31;
   if (e == 0) {
     return x;
@@ -44,7 +44,7 @@ int luaO_fb2int(int x) {
   }
 }
 
-int luaO_log2(unsigned int x) {
+int Object_log2(unsigned int x) {
   static const uint8_t log_2[256] = {
       0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5,
       5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
@@ -84,7 +84,7 @@ bool Object_rawEqual(const Value *t1, const Value *t2) {
   }
 }
 
-int luaO_str2d(const char *s, double *result) {
+int Object_str2d(const char *s, double *result) {
   char *endptr;
   *result = lua_str2number(s, &endptr);
   if (endptr == s) {
@@ -159,7 +159,7 @@ const char *Object_vsprintf(lua_State *L, const char *fmt, va_list argp) {
     fmt = e + 2;
   }
   pushStr(L, fmt);
-  luaV_concat(L, n + 1, (int)(L->top - L->base) - 1);
+  VM_concat(L, n + 1, (int)(L->top - L->base) - 1);
   L->top -= n;
   return VALUE_STRING_CONTENT(L->top - 1);
 }

@@ -391,7 +391,7 @@ static int listk(lua_State *L) {
   Prototype *p = CLOSURE_VALUE(obj_at(L, 1))->l.p;
   lua_createtable(L, p->constantsSize, 0);
   for (size_t i = 0; i < p->constantsSize; i++) {
-    luaA_pushobject(L, p->constants + i);
+    API_pushObject(L, p->constants + i);
     lua_rawseti(L, -2, i + 1);
   }
   return 1;
@@ -511,15 +511,15 @@ static int table_query(lua_State *L) {
     lua_pushinteger(L, t->lastfree - t->node);
   } else if (i < t->sizearray) {
     lua_pushinteger(L, i);
-    luaA_pushobject(L, &t->array[i]);
+    API_pushObject(L, &t->array[i]);
     lua_pushnil(L);
   } else if ((i -= t->sizearray) < sizenode(t)) {
     if (!IS_TYPE_NIL(gval(gnode(t, i))) || IS_TYPE_NIL(gkey(gnode(t, i))) ||
         IS_TYPE_NUMBER(gkey(gnode(t, i)))) {
-      luaA_pushobject(L, key2tval(gnode(t, i)));
+      API_pushObject(L, key2tval(gnode(t, i)));
     } else
       lua_pushliteral(L, "<undef>");
-    luaA_pushobject(L, gval(gnode(t, i)));
+    API_pushObject(L, gval(gnode(t, i)));
     if (gnext(&t->node[i]))
       lua_pushinteger(L, gnext(&t->node[i]) - t->node);
     else
@@ -693,14 +693,14 @@ static int doremote(lua_State *L) {
 }
 
 static int log2_aux(lua_State *L) {
-  lua_pushinteger(L, luaO_log2(luaL_checkint(L, 1)));
+  lua_pushinteger(L, Object_log2(luaL_checkint(L, 1)));
   return 1;
 }
 
 static int int2fb_aux(lua_State *L) {
-  int b = luaO_int2fb(luaL_checkint(L, 1));
+  int b = Object_int2fb(luaL_checkint(L, 1));
   lua_pushinteger(L, b);
-  lua_pushinteger(L, luaO_fb2int(b));
+  lua_pushinteger(L, Object_fb2int(b));
   return 2;
 }
 

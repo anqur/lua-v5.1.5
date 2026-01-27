@@ -47,7 +47,7 @@ void Codegen_emitNil(FuncState *fs, int from, int n) {
 int Codegen_jump(FuncState *fs) {
   int jpc = fs->jpc; /* save list of jumps to here */
   fs->jpc = NO_JUMP;
-  int j = luaK_codeAsBx(fs, OP_JMP, 0, NO_JUMP);
+  int j = Codegen_codeAsBx(fs, OP_JMP, 0, NO_JUMP);
   Codegen_concat(fs, &j, jpc); /* keep them on hold */
   return j;
 }
@@ -192,7 +192,7 @@ void Codegen_reserveStack(FuncState *fs, int n) {
   }
 }
 
-void luaK_reserveRegs(FuncState *fs, int n) {
+void Codegen_reserveRegs(FuncState *fs, int n) {
   Codegen_reserveStack(fs, n);
   fs->freereg += n;
 }
@@ -230,7 +230,7 @@ static size_t addConstant(FuncState *fs, Value *k, Value *v) {
     SET_NIL(&f->constants[oldSize++]);
   }
   SET_OBJECT(L, &f->constants[fs->nk], v);
-  luaC_barrier(L, f, v);
+  GC_barrier(L, f, v);
   return fs->nk++;
 }
 
@@ -268,7 +268,7 @@ void Codegen_setReturnMulti(FuncState *fs, ExprInfo *e, int resultsNum) {
     const size_t pc = e->u.varargCallPC;
     SETARG_B(fs->f->code[pc], resultsNum + 1);
     SETARG_A(fs->f->code[pc], fs->freereg);
-    luaK_reserveRegs(fs, 1);
+    Codegen_reserveRegs(fs, 1);
   }
 }
 
@@ -359,7 +359,7 @@ static void releaseToReg(FuncState *fs, ExprInfo *e, int reg) {
 
 static void releaseToAnyReg(FuncState *fs, ExprInfo *e) {
   if (e->k != EXPR_NON_RELOC) {
-    luaK_reserveRegs(fs, 1);
+    Codegen_reserveRegs(fs, 1);
     releaseToReg(fs, e, fs->freereg - 1);
   }
 }
@@ -393,7 +393,7 @@ static void exprToReg(FuncState *fs, ExprInfo *e, int reg) {
 void Codegen_exprToNextReg(FuncState *fs, ExprInfo *e) {
   Codegen_releaseVars(fs, e);
   freeExpr(fs, e);
-  luaK_reserveRegs(fs, 1);
+  Codegen_reserveRegs(fs, 1);
   exprToReg(fs, e, fs->freereg - 1);
 }
 
@@ -484,7 +484,7 @@ void Codegen_self(FuncState *fs, ExprInfo *e, ExprInfo *key) {
   Codegen_exprToAnyReg(fs, e);
   freeExpr(fs, e);
   int func = fs->freereg;
-  luaK_reserveRegs(fs, 2);
+  Codegen_reserveRegs(fs, 2);
   assert(e->k == EXPR_NON_RELOC);
   Codegen_emitABC(fs, OP_SELF, func, e->u.nonRelocReg,
                   Codegen_exprToRK(fs, key));
@@ -852,7 +852,7 @@ size_t Codegen_emitABx(FuncState *fs, OpCode o, int A, unsigned int Bx) {
   return emitCode(fs, CREATE_ABx(o, A, Bx), fs->ls->lastline);
 }
 
-void luaK_setlist(FuncState *fs, int base, int nelems, int tostore) {
+void Codegen_setList(FuncState *fs, int base, int nelems, int tostore) {
   int c = (nelems - 1) / LFIELDS_PER_FLUSH + 1;
   int b = (tostore == LUA_MULTRET) ? 0 : tostore;
   assert(tostore != 0);

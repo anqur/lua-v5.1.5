@@ -118,7 +118,7 @@ static int findindex(lua_State *L, Table *t, StackIndex key) {
     }
     n = gnext(n);
   } while (n);
-  luaG_runerror(L, "invalid key to 'next'"); /* key not found */
+  Error_runError(L, "invalid key to 'next'"); /* key not found */
   return 0;
 }
 
@@ -229,7 +229,7 @@ static void resizeBuckets(lua_State *L, Table *t, int size) {
   } else {
     lsize = ceillog2(size);
     if (lsize > MAXBITS) {
-      luaG_runerror(L, "table overflow");
+      Error_runError(L, "table overflow");
     }
     size = twoto(lsize);
     t->node = Mem_newVec(L, size, Node);
@@ -298,7 +298,7 @@ static void rehash(lua_State *L, Table *t, const Value *ek) {
 
 Table *Table_new(lua_State *L, int narray, int nhash) {
   Table *t = Mem_new(L, Table);
-  luaC_link(L, LuaObjectToGCObject(t), LUA_TYPE_TABLE);
+  GC_link(L, LuaObjectToGCObject(t), LUA_TYPE_TABLE);
   t->metatable = nullptr;
   t->flags = (uint8_t)(~0);
   /* temporary values (kept only if some malloc fails) */
@@ -363,7 +363,7 @@ static Value *insertNewKey(lua_State *L, Table *t, const Value *key) {
   }
   gkey(mp)->variant = key->variant;
   gkey(mp)->tt = key->tt;
-  luaC_barriert(L, t, key);
+  GC_barrierT(L, t, key);
   assert(IS_TYPE_NIL(gval(mp)));
   return gval(mp);
 }
@@ -429,9 +429,9 @@ Value *Table_insert(lua_State *L, Table *t, const Value *key) {
     return (Value *)p;
   }
   if (IS_TYPE_NIL(key)) {
-    luaG_runerror(L, "table index is nil");
+    Error_runError(L, "table index is nil");
   } else if (IS_TYPE_NUMBER(key) && isnan(NUMBER_VALUE(key))) {
-    luaG_runerror(L, "table index is NaN");
+    Error_runError(L, "table index is NaN");
   }
   return insertNewKey(L, t, key);
 }

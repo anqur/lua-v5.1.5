@@ -50,7 +50,7 @@ static String *createStr(lua_State *L, const char *str, size_t len,
   String *ts = Mem_alloc(L, sizeof(String) + len + 1);
   ts->len = len;
   ts->hash = h;
-  ts->header.marked = luaC_white(G(L));
+  ts->header.marked = GC_white(G(L));
   ts->header.tt = LUA_TYPE_STRING;
   ts->keywordID = 0;
   memcpy(ts + 1, str, len * sizeof(char));
@@ -107,7 +107,7 @@ Userdata *Userdata_new(lua_State *L, size_t size, Table *env) {
   }
 
   Userdata *u = Mem_alloc(L, size + sizeof(Userdata));
-  u->header.marked = luaC_white(G(L)); /* is not finalized */
+  u->header.marked = GC_white(G(L)); /* is not finalized */
   u->header.tt = LUA_TYPE_USERDATA;
   u->len = size;
   u->metatable = nullptr;

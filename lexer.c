@@ -84,13 +84,13 @@ void Lex_throw(LexState *ls, const char *errmsg) {
   Lex_throwWith(ls, errmsg, ls->t.token);
 }
 
-String *luaX_newstring(LexState *ls, const char *str, size_t l) {
+String *Lexer_newString(LexState *ls, const char *str, size_t l) {
   lua_State *L = ls->L;
   String *ts = String_createSized(L, str, l);
   Value *o = Table_insertString(L, ls->fs->h, ts); /* entry for `str' */
   if (IS_TYPE_NIL(o)) {
     SET_BOOL(o, 1); /* make sure `str' will not be collected */
-    luaC_checkGC(L);
+    GC_checkGC(L);
   }
   return ts;
 }
@@ -152,7 +152,7 @@ static void tryLocaleDecPoint(LexState *ls, Literal *lit) {
   ls->dec_point = cv ? cv->decimal_point[0] : '.';
   replaceAll(ls, old, ls->dec_point);
 
-  if (!luaO_str2d(StringBuilder_get(ls->tokens), &lit->num)) {
+  if (!Object_str2d(StringBuilder_get(ls->tokens), &lit->num)) {
     // Still getting format error with the correct decimal point.
 
     // Undo changes (for error messages).
@@ -175,7 +175,7 @@ static void readNumber(LexState *ls, Literal *lit) {
   save(ls, '\0');
 
   replaceAll(ls, '.', ls->dec_point);
-  if (!luaO_str2d(StringBuilder_get(ls->tokens), &lit->num)) {
+  if (!Object_str2d(StringBuilder_get(ls->tokens), &lit->num)) {
     tryLocaleDecPoint(ls, lit);
   }
 }
@@ -241,8 +241,8 @@ static void readLongString(LexState *ls, Literal *lit, int sep) {
 
 endloop:
   if (lit) {
-    lit->str = luaX_newstring(ls, StringBuilder_get(ls->tokens) + (2 + sep),
-                              StringBuilder_len(ls->tokens) - 2 * (2 + sep));
+    lit->str = Lexer_newString(ls, StringBuilder_get(ls->tokens) + (2 + sep),
+                               StringBuilder_len(ls->tokens) - 2 * (2 + sep));
   }
 }
 
@@ -319,8 +319,8 @@ static void readString(LexState *ls, int del, Literal *lit) {
   }
   // Skip delimiter.
   SAVE_AND_NEXT(ls);
-  lit->str = luaX_newstring(ls, StringBuilder_get(ls->tokens) + 1,
-                            StringBuilder_len(ls->tokens) - 2);
+  lit->str = Lexer_newString(ls, StringBuilder_get(ls->tokens) + 1,
+                             StringBuilder_len(ls->tokens) - 2);
 }
 
 static int doLex(LexState *ls, Literal *lit) {
@@ -427,8 +427,8 @@ static int doLex(LexState *ls, Literal *lit) {
         do {
           SAVE_AND_NEXT(ls);
         } while (isalnum(ls->current) || ls->current == '_');
-        ts = luaX_newstring(ls, StringBuilder_get(ls->tokens),
-                            StringBuilder_len(ls->tokens));
+        ts = Lexer_newString(ls, StringBuilder_get(ls->tokens),
+                             StringBuilder_len(ls->tokens));
         if (ts->keywordID) {
           return ts->keywordID - 1 + FIRST_RESERVED;
         }

@@ -39,7 +39,7 @@ typedef enum OpKind {
   OPR_OR,
 } OpKind;
 
-#define luaK_codeAsBx(fs, o, A, sBx)                                           \
+#define Codegen_codeAsBx(fs, o, A, sBx)                                        \
   Codegen_emitABx(fs, o, A, (sBx) + MAXARG_sBx)
 
 LUAI_FUNC size_t Codegen_emitABx(FuncState *fs, OpCode o, int A,
@@ -47,7 +47,7 @@ LUAI_FUNC size_t Codegen_emitABx(FuncState *fs, OpCode o, int A,
 LUAI_FUNC size_t Codegen_emitABC(FuncState *fs, OpCode o, int a, int b, int c);
 LUAI_FUNC void Codegen_fixLine(FuncState *fs, int line);
 LUAI_FUNC void Codegen_emitNil(FuncState *fs, int from, int n);
-LUAI_FUNC void luaK_reserveRegs(FuncState *fs, int n);
+LUAI_FUNC void Codegen_reserveRegs(FuncState *fs, int n);
 LUAI_FUNC void Codegen_reserveStack(FuncState *fs, int n);
 LUAI_FUNC size_t Codegen_addString(FuncState *fs, String *s);
 LUAI_FUNC size_t Codegen_addNumber(FuncState *fs, double r);
@@ -73,4 +73,5 @@ LUAI_FUNC void Codegen_prefix(FuncState *fs, OpKind op, ExprInfo *a);
 LUAI_FUNC void Codegen_infix(FuncState *fs, OpKind op, ExprInfo *v);
 LUAI_FUNC void Codegen_suffix(FuncState *fs, OpKind op, ExprInfo *e1,
                               ExprInfo *e2);
-LUAI_FUNC void luaK_setlist(FuncState *fs, int base, int nelems, int tostore);
+LUAI_FUNC void Codegen_setList(FuncState *fs, int base, int nelems,
+                               int tostore);

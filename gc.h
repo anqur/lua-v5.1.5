@@ -62,50 +62,50 @@
 
 #define valiswhite(x) (IS_COLLECTABLE(x) && iswhite(GC_VALUE(x)))
 
-#define luaC_white(g) cast(uint8_t, (g)->currentwhite &WHITEBITS)
+#define GC_white(g) cast(uint8_t, (g)->currentwhite &WHITEBITS)
 
-#define luaC_checkGC(L)                                                        \
+#define GC_checkGC(L)                                                          \
   do {                                                                         \
-    condhardstacktests(luaD_reallocstack(L, L->stackSize - EXTRA_STACK - 1));  \
+    condhardstacktests(Stack_reallocStack(L, L->stackSize - EXTRA_STACK - 1)); \
     if (G(L)->totalbytes >= G(L)->GCthreshold) {                               \
-      luaC_step(L);                                                            \
+      GC_step(L);                                                              \
     }                                                                          \
   } while (false)
 
-#define luaC_barrier(L, p, v)                                                  \
+#define GC_barrier(L, p, v)                                                    \
   do {                                                                         \
     if (valiswhite(v) && isblack(LuaObjectToGCObject(p))) {                    \
-      luaC_barrierf(L, LuaObjectToGCObject(p), GC_VALUE(v));                   \
+      GC_barrierF(L, LuaObjectToGCObject(p), GC_VALUE(v));                     \
     }                                                                          \
   } while (false)
 
-#define luaC_barriert(L, t, v)                                                 \
+#define GC_barrierT(L, t, v)                                                   \
   do {                                                                         \
     if (valiswhite(v) && isblack(LuaObjectToGCObject(t))) {                    \
-      luaC_barrierback(L, t);                                                  \
+      GC_barrierBack(L, t);                                                    \
     }                                                                          \
   } while (false)
 
-#define luaC_objbarrier(L, p, o)                                               \
+#define GC_objbarrier(L, p, o)                                                 \
   do {                                                                         \
     if (iswhite(LuaObjectToGCObject(o)) && isblack(LuaObjectToGCObject(p))) {  \
-      luaC_barrierf(L, LuaObjectToGCObject(p), LuaObjectToGCObject(o));        \
+      GC_barrierF(L, LuaObjectToGCObject(p), LuaObjectToGCObject(o));          \
     }                                                                          \
   } while (false)
 
-#define luaC_objbarriert(L, t, o)                                              \
+#define GC_objbarrierT(L, t, o)                                                \
   do {                                                                         \
     if (iswhite(LuaObjectToGCObject(o)) && isblack(LuaObjectToGCObject(t))) {  \
-      luaC_barrierback(L, t);                                                  \
+      GC_barrierBack(L, t);                                                    \
     }                                                                          \
   } while (false)
 
-LUAI_FUNC size_t luaC_separateudata(lua_State *L, int all);
-LUAI_FUNC void luaC_callGCTM(lua_State *L);
-LUAI_FUNC void luaC_freeall(lua_State *L);
-LUAI_FUNC void luaC_step(lua_State *L);
-LUAI_FUNC void luaC_fullgc(lua_State *L);
-LUAI_FUNC void luaC_link(lua_State *L, GCObject *o, uint8_t tt);
-LUAI_FUNC void luaC_linkupval(lua_State *L, Upvalue *uv);
-LUAI_FUNC void luaC_barrierf(lua_State *L, GCObject *o, GCObject *v);
-LUAI_FUNC void luaC_barrierback(lua_State *L, Table *t);
+LUAI_FUNC size_t GC_separateUserdata(lua_State *L, int all);
+LUAI_FUNC void GC_callGCTM(lua_State *L);
+LUAI_FUNC void GC_freeAll(lua_State *L);
+LUAI_FUNC void GC_step(lua_State *L);
+LUAI_FUNC void GC_fullGC(lua_State *L);
+LUAI_FUNC void GC_link(lua_State *L, GCObject *o, uint8_t tt);
+LUAI_FUNC void GC_linkUpValue(lua_State *L, Upvalue *uv);
+LUAI_FUNC void GC_barrierF(lua_State *L, GCObject *o, GCObject *v);
+LUAI_FUNC void GC_barrierBack(lua_State *L, Table *t);

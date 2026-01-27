@@ -15,19 +15,19 @@
 /* limit for table tag-method chains (to avoid loops) */
 #define MAXTAGLOOP 100
 
-const Value *luaV_tonumber(const Value *obj, Value *n) {
+const Value *VM_toNumber(const Value *obj, Value *n) {
   if (IS_TYPE_NUMBER(obj)) {
     return obj;
   }
   double num;
-  if (IS_TYPE_STRING(obj) && luaO_str2d(VALUE_STRING_CONTENT(obj), &num)) {
+  if (IS_TYPE_STRING(obj) && Object_str2d(VALUE_STRING_CONTENT(obj), &num)) {
     SET_NUMBER(n, num);
     return n;
   }
   return nullptr;
 }
 
-bool luaV_tostring(lua_State *L, StackIndex obj) {
+bool VM_toString(lua_State *L, StackIndex obj) {
   if (!IS_TYPE_NUMBER(obj)) {
     return false;
   }
@@ -64,9 +64,9 @@ static void callTMres(lua_State *L, StackIndex res, const Value *f,
   SET_OBJECT_TO_STACK(L, L->top, f);      /* push function */
   SET_OBJECT_TO_STACK(L, L->top + 1, p1); /* 1st argument */
   SET_OBJECT_TO_STACK(L, L->top + 2, p2); /* 2nd argument */
-  luaD_checkstack(L, 3);
+  Stack_checkStack(L, 3);
   L->top += 3;
-  luaD_call(L, L->top - 3, 1);
+  Stack_call(L, L->top - 3, 1);
   res = RESTORE_STACK(L, result);
   L->top--;
   SET_OBJECT_TO_SAME_STACK(L, res, L->top);
@@ -78,12 +78,12 @@ static void callTM(lua_State *L, const Value *f, const Value *p1,
   SET_OBJECT_TO_STACK(L, L->top + 1, p1); /* 1st argument */
   SET_OBJECT_TO_STACK(L, L->top + 2, p2); /* 2nd argument */
   SET_OBJECT_TO_STACK(L, L->top + 3, p3); /* 3th argument */
-  luaD_checkstack(L, 4);
+  Stack_checkStack(L, 4);
   L->top += 4;
-  luaD_call(L, L->top - 4, 0);
+  Stack_call(L, L->top - 4, 0);
 }
 
-void luaV_gettable(lua_State *L, const Value *t, Value *key, StackIndex val) {
+void VM_getTable(lua_State *L, const Value *t, Value *key, StackIndex val) {
   for (int loop = 0; loop < MAXTAGLOOP; loop++) {
     const Value *tm;
     if (IS_TYPE_TABLE(t)) { /* `t' is a table? */
@@ -96,8 +96,8 @@ void luaV_gettable(lua_State *L, const Value *t, Value *key, StackIndex val) {
         return;
       }
       /* else will try the tag method */
-    } else if (IS_TYPE_NIL(tm = luaT_gettmbyobj(L, t, TM_INDEX))) {
-      luaG_typeerror(L, t, "index");
+    } else if (IS_TYPE_NIL(tm = Tag_getTMByObj(L, t, TM_INDEX))) {
+      Error_typeError(L, t, "index");
     }
     if (IS_TYPE_FUNCTION(tm)) {
       callTMres(L, val, tm, t, key);
@@ -105,10 +105,10 @@ void luaV_gettable(lua_State *L, const Value *t, Value *key, StackIndex val) {
     }
     t = tm; /* else repeat with `tm' */
   }
-  luaG_runerror(L, "loop in gettable");
+  Error_runError(L, "loop in gettable");
 }
 
-void luaV_settable(lua_State *L, const Value *t, Value *key, StackIndex val) {
+void VM_setTable(lua_State *L, const Value *t, Value *key, StackIndex val) {
   int loop;
   Value temp;
   for (loop = 0; loop < MAXTAGLOOP; loop++) {
@@ -121,12 +121,12 @@ void luaV_settable(lua_State *L, const Value *t, Value *key, StackIndex val) {
               nullptr) { /* or no TM? */
         SET_OBJECT_TO_TABLE(L, oldval, val);
         h->flags = 0;
-        luaC_barriert(L, h, val);
+        GC_barrierT(L, h, val);
         return;
       }
       /* else will try the tag method */
-    } else if (IS_TYPE_NIL(tm = luaT_gettmbyobj(L, t, TM_NEWINDEX))) {
-      luaG_typeerror(L, t, "index");
+    } else if (IS_TYPE_NIL(tm = Tag_getTMByObj(L, t, TM_NEWINDEX))) {
+      Error_typeError(L, t, "index");
     }
     if (IS_TYPE_FUNCTION(tm)) {
       callTM(L, tm, t, key, val);
@@ -136,14 +136,14 @@ void luaV_settable(lua_State *L, const Value *t, Value *key, StackIndex val) {
     SET_OBJECT(L, &temp, tm); /* avoid pointing inside table (may rehash) */
     t = &temp;
   }
-  luaG_runerror(L, "loop in settable");
+  Error_runError(L, "loop in settable");
 }
 
 static bool callBinaryTM(lua_State *L, const Value *p1, const Value *p2,
                          StackIndex res, TMS event) {
-  const Value *tm = luaT_gettmbyobj(L, p1, event);
+  const Value *tm = Tag_getTMByObj(L, p1, event);
   if (IS_TYPE_NIL(tm)) {
-    tm = luaT_gettmbyobj(L, p2, event);
+    tm = Tag_getTMByObj(L, p2, event);
   }
   if (IS_TYPE_NIL(tm)) {
     return false;
@@ -175,12 +175,12 @@ static const Value *getOrderTM(lua_State *L, Table *mt1, Table *mt2,
 
 static int callOrderTM(lua_State *L, const Value *p1, const Value *p2,
                        TMS event) {
-  const Value *tm1 = luaT_gettmbyobj(L, p1, event);
+  const Value *tm1 = Tag_getTMByObj(L, p1, event);
   if (IS_TYPE_NIL(tm1)) {
     return -1;
   }
 
-  const Value *tm2 = luaT_gettmbyobj(L, p2, event);
+  const Value *tm2 = Tag_getTMByObj(L, p2, event);
   if (!Object_rawEqual(tm1, tm2)) {
     return -1;
   }
@@ -218,7 +218,7 @@ static int stringCompare(const String *ls, const String *rs) {
 
 bool Object_lessThan(lua_State *L, const Value *l, const Value *r) {
   if (GET_TYPE(l) != GET_TYPE(r)) {
-    luaG_ordererror(L, l, r);
+    Error_orderError(L, l, r);
     return false;
   }
   if (IS_TYPE_NUMBER(l)) {
@@ -231,12 +231,12 @@ bool Object_lessThan(lua_State *L, const Value *l, const Value *r) {
   if (res != -1) {
     return res;
   }
-  luaG_ordererror(L, l, r);
+  Error_orderError(L, l, r);
 }
 
 static bool lessEqual(lua_State *L, const Value *l, const Value *r) {
   if (GET_TYPE(l) != GET_TYPE(r)) {
-    luaG_ordererror(L, l, r);
+    Error_orderError(L, l, r);
     return false;
   }
   if (IS_TYPE_NUMBER(l)) {
@@ -253,7 +253,7 @@ static bool lessEqual(lua_State *L, const Value *l, const Value *r) {
   if (res != -1) {
     return !res;
   }
-  luaG_ordererror(L, l, r);
+  Error_orderError(L, l, r);
 }
 
 bool Object_equal(lua_State *L, const Value *t1, const Value *t2) {
@@ -292,14 +292,14 @@ bool Object_equal(lua_State *L, const Value *t1, const Value *t2) {
   return !IS_FALSE(L->top);
 }
 
-void luaV_concat(lua_State *L, int total, int last) {
+void VM_concat(lua_State *L, int total, int last) {
   do {
     StackIndex top = L->base + last + 1;
     int n = 2; /* number of elements handled in this pass (at least 2) */
     if (!(IS_TYPE_STRING(top - 2) || IS_TYPE_NUMBER(top - 2)) ||
         !tostring(L, top - 1)) {
       if (!callBinaryTM(L, top - 2, top - 1, top - 2, TM_CONCAT)) {
-        luaG_concaterror(L, top - 2, top - 1);
+        Error_concatError(L, top - 2, top - 1);
       }
     } else if (STRING_VALUE(top - 1)->len == 0) { /* second op is empty? */
       tostring(L, top - 2); /* result is first op (as string) */
@@ -312,11 +312,11 @@ void luaV_concat(lua_State *L, int total, int last) {
       for (n = 1; n < total && tostring(L, top - n - 1); n++) {
         size_t l = STRING_VALUE(top - n - 1)->len;
         if (l >= SIZE_MAX - tl) {
-          luaG_runerror(L, "string length overflow");
+          Error_runError(L, "string length overflow");
         }
         tl += l;
       }
-      buffer = luaZ_reserve(L, &G(L)->buff, tl);
+      buffer = Buffer_reserve(L, &G(L)->buff, tl);
       tl = 0;
       for (i = n; i > 0; i--) { /* concat all strings */
         size_t l = STRING_VALUE(top - i)->len;
@@ -334,8 +334,8 @@ static void Arith(lua_State *L, StackIndex ra, const Value *rb, const Value *rc,
                   TMS op) {
   Value tempb, tempc;
   const Value *b, *c;
-  if ((b = luaV_tonumber(rb, &tempb)) != nullptr &&
-      (c = luaV_tonumber(rc, &tempc)) != nullptr) {
+  if ((b = VM_toNumber(rb, &tempb)) != nullptr &&
+      (c = VM_toNumber(rc, &tempc)) != nullptr) {
     double nb = NUMBER_VALUE(b), nc = NUMBER_VALUE(c);
     switch (op) {
     case TM_ADD:
@@ -364,12 +364,12 @@ static void Arith(lua_State *L, StackIndex ra, const Value *rb, const Value *rc,
       break;
     }
   } else if (!callBinaryTM(L, rb, rc, ra, op)) {
-    luaG_aritherror(L, rb, rc);
+    Error_arithmeticError(L, rb, rc);
   }
 }
 
 /*
-** some macros for common tasks in `luaV_execute'
+** some macros for common tasks in `VM_execute'
 */
 
 #define RUNTIME_CHECK(L, c)                                                    \
@@ -402,9 +402,7 @@ static void Arith(lua_State *L, StackIndex ra, const Value *rb, const Value *rc,
 #define Protect(x)                                                             \
   {                                                                            \
     L->savedPC = pc;                                                           \
-    {                                                                          \
-      x;                                                                       \
-    };                                                                         \
+    { x; };                                                                    \
     base = L->base;                                                            \
   }
 
@@ -434,7 +432,7 @@ static void Arith(lua_State *L, StackIndex ra, const Value *rb, const Value *rc,
     }                                                                          \
   } while (false)
 
-void luaV_execute(lua_State *L, int nexeccalls) {
+void VM_execute(lua_State *L, int nexeccalls) {
   LClosure *cl;
   StackIndex base;
   Value *k;
@@ -462,7 +460,7 @@ reentry: /* entry point */
     ra = RA(i);
     assert(base == L->base && L->base == L->ci->base);
     assert(base <= L->top && L->top <= L->stack + L->stackSize);
-    assert(L->top == L->ci->top || luaG_checkopenop(i));
+    assert(L->top == L->ci->top || Error_checkOpenOp(i));
     switch (GET_OPCODE(i)) {
     case OP_MOVE: {
       SET_OBJECT_TO_SAME_STACK(L, ra, RB(i));
@@ -496,41 +494,41 @@ reentry: /* entry point */
       Value *rb = KBx(i);
       SET_TABLE(L, &g, cl->header.env);
       assert(IS_TYPE_STRING(rb));
-      Protect(luaV_gettable(L, &g, rb, ra));
+      Protect(VM_getTable(L, &g, rb, ra));
       continue;
     }
     case OP_GETTABLE: {
-      Protect(luaV_gettable(L, RB(i), RKC(i), ra));
+      Protect(VM_getTable(L, RB(i), RKC(i), ra));
       continue;
     }
     case OP_SETGLOBAL: {
       Value g;
       SET_TABLE(L, &g, cl->header.env);
       assert(IS_TYPE_STRING(KBx(i)));
-      Protect(luaV_settable(L, &g, KBx(i), ra));
+      Protect(VM_setTable(L, &g, KBx(i), ra));
       continue;
     }
     case OP_SETUPVAL: {
       Upvalue *uv = cl->upvalues[GETARG_B(i)];
       SET_OBJECT(L, uv->v, ra);
-      luaC_barrier(L, uv, ra);
+      GC_barrier(L, uv, ra);
       continue;
     }
     case OP_SETTABLE: {
-      Protect(luaV_settable(L, ra, RKB(i), RKC(i)));
+      Protect(VM_setTable(L, ra, RKB(i), RKC(i)));
       continue;
     }
     case OP_NEWTABLE: {
       int b = GETARG_B(i);
       int c = GETARG_C(i);
-      SET_TABLE(L, ra, Table_new(L, luaO_fb2int(b), luaO_fb2int(c)));
-      Protect(luaC_checkGC(L));
+      SET_TABLE(L, ra, Table_new(L, Object_fb2int(b), Object_fb2int(c)));
+      Protect(GC_checkGC(L));
       continue;
     }
     case OP_SELF: {
       StackIndex rb = RB(i);
       SET_OBJECT_TO_SAME_STACK(L, ra + 1, rb);
-      Protect(luaV_gettable(L, rb, RKC(i), ra));
+      Protect(VM_getTable(L, rb, RKC(i), ra));
       continue;
     }
     case OP_ADD:
@@ -579,7 +577,7 @@ reentry: /* entry point */
       }
       default: { /* try metamethod */
         Protect(if (!callBinaryTM(L, rb, &valueNil, ra, TM_LEN))
-                    luaG_typeerror(L, rb, "get length of");)
+                    Error_typeError(L, rb, "get length of");)
       }
       }
       continue;
@@ -587,7 +585,7 @@ reentry: /* entry point */
     case OP_CONCAT: {
       int b = GETARG_B(i);
       int c = GETARG_C(i);
-      Protect(luaV_concat(L, c - b + 1, c); luaC_checkGC(L));
+      Protect(VM_concat(L, c - b + 1, c); GC_checkGC(L));
       SET_OBJECT_TO_SAME_STACK(L, RA(i), base + b);
       continue;
     }
@@ -637,7 +635,7 @@ reentry: /* entry point */
       switch (Stack_preCall(L, ra, nresults)) {
       case PCR_LUA_READY:
         nexeccalls++;
-        goto reentry; /* restart luaV_execute over new Lua function */
+        goto reentry; /* restart VM_execute over new Lua function */
       case PCR_C_DONE:
         /* it was a C function (`precall' called it); adjust results */
         if (nresults >= 0) {
@@ -723,11 +721,11 @@ reentry: /* entry point */
       const Value *pstep = ra + 2;
       L->savedPC = pc; /* next steps may throw errors */
       if (!tonumber(init, ra)) {
-        luaG_runerror(L, "'for' initial value must be a number");
+        Error_runError(L, "'for' initial value must be a number");
       } else if (!tonumber(plimit, ra + 1)) {
-        luaG_runerror(L, "'for' limit must be a number");
+        Error_runError(L, "'for' limit must be a number");
       } else if (!tonumber(pstep, ra + 2)) {
-        luaG_runerror(L, "'for' step must be a number");
+        Error_runError(L, "'for' step must be a number");
       }
       SET_NUMBER(ra, NUMBER_VALUE(ra) - NUMBER_VALUE(pstep));
       dojump(L, pc, GETARG_sBx(i));
@@ -739,7 +737,7 @@ reentry: /* entry point */
       SET_OBJECT_TO_SAME_STACK(L, cb + 1, ra + 1);
       SET_OBJECT_TO_SAME_STACK(L, cb, ra);
       L->top = cb + 3; /* func. + 2 args (state and index) */
-      Protect(luaD_call(L, cb, GETARG_C(i)));
+      Protect(Stack_call(L, cb, GETARG_C(i)));
       L->top = L->ci->top;
       cb = RA(i) + 3;         /* previous call may change the stack */
       if (!IS_TYPE_NIL(cb)) { /* continue loop? */
@@ -770,7 +768,7 @@ reentry: /* entry point */
       for (; n > 0; n--) {
         Value *val = ra + n;
         SET_OBJECT_TO_TABLE(L, Table_insertInteger(L, h, last--), val);
-        luaC_barriert(L, h, val);
+        GC_barrierT(L, h, val);
       }
       continue;
     }
@@ -795,7 +793,7 @@ reentry: /* entry point */
         }
       }
       SET_CLOSURE(L, ra, ncl);
-      Protect(luaC_checkGC(L));
+      Protect(GC_checkGC(L));
       continue;
     }
     case OP_VARARG: {
@@ -804,7 +802,7 @@ reentry: /* entry point */
       CallInfo *ci = L->ci;
       int n = (int)(ci->base - ci->func) - cl->p->paramsNum - 1;
       if (b == LUA_MULTRET) {
-        Protect(luaD_checkstack(L, n));
+        Protect(Stack_checkStack(L, n));
         ra = RA(i); /* previous call may change the stack */
         b = n;
         L->top = ra + n;

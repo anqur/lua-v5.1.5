@@ -20,7 +20,7 @@
 #define maskmarks (uint8_t)(~(bitmask(BLACKBIT) | WHITEBITS))
 
 #define makewhite(g, x)                                                        \
-  ((x)->gch.marked = (uint8_t)(((x)->gch.marked & maskmarks) | luaC_white(g)))
+  ((x)->gch.marked = (uint8_t)(((x)->gch.marked & maskmarks) | GC_white(g)))
 
 #define white2gray(x) reset2bits((x)->gch.marked, WHITE0BIT, WHITE1BIT)
 #define black2gray(x) resetbit((x)->gch.marked, BLACKBIT)
@@ -116,7 +116,7 @@ static void marktmu(GlobalState *g) {
 }
 
 /* move `dead' udata that need finalization to list `tmudata' */
-size_t luaC_separateudata(lua_State *L, int all) {
+size_t GC_separateUserdata(lua_State *L, int all) {
   GlobalState *g = G(L);
   size_t deadmem = 0;
   GCObject **p = &g->mainthread->header.next;
@@ -474,7 +474,7 @@ static void GCTM(lua_State *L) {
     SET_OBJECT_TO_STACK(L, L->top, tm);
     SET_USERDATA(L, L->top + 1, udata);
     L->top += 2;
-    luaD_call(L, L->top - 2, 0);
+    Stack_call(L, L->top - 2, 0);
     L->allowHook = allowHook; /* restore hooks */
     g->GCthreshold = oldt;    /* restore threshold */
   }
@@ -483,13 +483,13 @@ static void GCTM(lua_State *L) {
 /*
 ** Call all GC tag methods
 */
-void luaC_callGCTM(lua_State *L) {
+void GC_callGCTM(lua_State *L) {
   while (G(L)->tmudata) {
     GCTM(L);
   }
 }
 
-void luaC_freeall(lua_State *L) {
+void GC_freeAll(lua_State *L) {
   GlobalState *g = G(L);
   // Mask to collect all elements.
   g->currentwhite = WHITEBITS | bitmask(SFIXEDBIT);
@@ -550,9 +550,9 @@ static void atomic(lua_State *L) {
   g->gray = g->grayagain;
   g->grayagain = nullptr;
   propagateall(g);
-  udsize = luaC_separateudata(L, 0); /* separate userdata to be finalized */
-  marktmu(g);                        /* mark `preserved' userdata */
-  udsize += propagateall(g);         /* remark, to propagate `preserveness' */
+  udsize = GC_separateUserdata(L, 0); /* separate userdata to be finalized */
+  marktmu(g);                         /* mark `preserved' userdata */
+  udsize += propagateall(g);          /* remark, to propagate `preserveness' */
   cleartable(g->weak); /* remove collected objects from weak tables */
   /* flip current white */
   g->currentwhite = (uint8_t)otherwhite(g);
@@ -618,7 +618,7 @@ static ptrdiff_t singlestep(lua_State *L) {
   }
 }
 
-void luaC_step(lua_State *L) {
+void GC_step(lua_State *L) {
   GlobalState *g = G(L);
   ptrdiff_t lim = (GCSTEPSIZE / 100) * g->gcstepmul;
   if (lim == 0) {
@@ -643,7 +643,7 @@ void luaC_step(lua_State *L) {
   }
 }
 
-void luaC_fullgc(lua_State *L) {
+void GC_fullGC(lua_State *L) {
   GlobalState *g = G(L);
   if (g->gcstate <= GCSpropagate) {
     /* reset sweep marks to sweep all elements (returning them to white) */
@@ -668,7 +668,7 @@ void luaC_fullgc(lua_State *L) {
   setthreshold(g);
 }
 
-void luaC_barrierf(lua_State *L, GCObject *o, GCObject *v) {
+void GC_barrierF(lua_State *L, GCObject *o, GCObject *v) {
   GlobalState *g = G(L);
   assert(isblack(o) && iswhite(v) && !IS_DEAD(g, v) && !IS_DEAD(g, o));
   assert(g->gcstate != GCSfinalize && g->gcstate != GCSpause);
@@ -681,7 +681,7 @@ void luaC_barrierf(lua_State *L, GCObject *o, GCObject *v) {
   }
 }
 
-void luaC_barrierback(lua_State *L, Table *t) {
+void GC_barrierBack(lua_State *L, Table *t) {
   GlobalState *g = G(L);
   GCObject *o = LuaObjectToGCObject(t);
   assert(isblack(o) && !IS_DEAD(g, o));
@@ -691,15 +691,15 @@ void luaC_barrierback(lua_State *L, Table *t) {
   g->grayagain = o;
 }
 
-void luaC_link(lua_State *L, GCObject *o, uint8_t tt) {
+void GC_link(lua_State *L, GCObject *o, uint8_t tt) {
   GlobalState *g = G(L);
   o->gch.next = g->rootgc;
   g->rootgc = o;
-  o->gch.marked = luaC_white(g);
+  o->gch.marked = GC_white(g);
   o->gch.tt = tt;
 }
 
-void luaC_linkupval(lua_State *L, Upvalue *uv) {
+void GC_linkUpValue(lua_State *L, Upvalue *uv) {
   GlobalState *g = G(L);
   GCObject *o = LuaObjectToGCObject(uv);
   o->gch.next = g->rootgc; /* link upvalue into `rootgc' list */
@@ -707,7 +707,7 @@ void luaC_linkupval(lua_State *L, Upvalue *uv) {
   if (isgray(o)) {
     if (g->gcstate == GCSpropagate) {
       gray2black(o); /* closed upvalues need barrier */
-      luaC_barrier(L, uv, uv->v);
+      GC_barrier(L, uv, uv->v);
     } else { /* sweep phase: sweep it (turning it into white) */
       makewhite(g, o);
       assert(g->gcstate != GCSfinalize && g->gcstate != GCSpause);

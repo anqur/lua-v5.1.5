@@ -4,7 +4,7 @@
 #include "state.h"
 #include "table.h"
 
-void luaT_init(lua_State *L) {
+void Tag_init(lua_State *L) {
   static const char *const events[] = {
       [TM_INDEX] = "__index", [TM_NEWINDEX] = "__newindex",
       [TM_GC] = "__gc",       [TM_MODE] = "__mode",
@@ -26,7 +26,7 @@ void luaT_init(lua_State *L) {
 ** function to be used with macro "FAST_TM": optimized for absence of
 ** tag methods
 */
-const Value *luaT_gettm(Table *events, TMS event, String *ename) {
+const Value *Tag_getTM(Table *events, TMS event, String *ename) {
   const Value *tm = Table_getString(events, ename);
   assert(event <= TM_EQ);
   if (IS_TYPE_NIL(tm)) {                     /* no tag method? */
@@ -36,7 +36,7 @@ const Value *luaT_gettm(Table *events, TMS event, String *ename) {
   return tm;
 }
 
-const Value *luaT_gettmbyobj(lua_State *L, const Value *o, TMS event) {
+const Value *Tag_getTMByObj(lua_State *L, const Value *o, TMS event) {
   Table *mt;
   switch (GET_TYPE(o)) {
   case LUA_TYPE_TABLE:

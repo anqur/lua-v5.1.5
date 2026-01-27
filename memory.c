@@ -13,7 +13,7 @@ void *Mem_doGrowVec(lua_State *L, void *block, size_t *size, size_t elemSize,
   size_t newSize = limit;
   if (*size >= limit / 2 && *size >= limit) {
     // Cannot double it and even grow a little.
-    luaG_runerror(L, errMsg);
+    Error_runError(L, errMsg);
   } else {
     // Most of the time, we double the capacity.
     newSize = (*size) * 2;
@@ -28,7 +28,7 @@ void *Mem_doGrowVec(lua_State *L, void *block, size_t *size, size_t elemSize,
 }
 
 void *Mem_throwTooBig(lua_State *L) {
-  luaG_runerror(L, "memory allocation error: block too big");
+  Error_runError(L, "memory allocation error: block too big");
   return nullptr;
 }
 

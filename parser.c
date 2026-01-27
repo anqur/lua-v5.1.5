@@ -46,7 +46,7 @@ static void expr(LexState *ls, ExprInfo *v);
 static void anchor_token(LexState *ls) {
   if (ls->t.token == TK_NAME || ls->t.token == TK_STRING) {
     String *ts = ls->t.literal.str;
-    luaX_newstring(ls, STRING_CONTENT(ts), ts->len);
+    Lexer_newString(ls, STRING_CONTENT(ts), ts->len);
   }
 }
 
@@ -134,12 +134,12 @@ static size_t registerLocalVar(LexState *ls, String *varname) {
     f->locVars[oldSize++].name = nullptr;
   }
   f->locVars[fs->nlocvars].name = varname;
-  luaC_objbarrier(ls->L, f, varname);
+  GC_objbarrier(ls->L, f, varname);
   return fs->nlocvars++;
 }
 
 #define new_localvarliteral(ls, v, n)                                          \
-  new_localvar(ls, luaX_newstring(ls, "" v, (sizeof(v) / sizeof(char)) - 1), n)
+  new_localvar(ls, Lexer_newString(ls, "" v, (sizeof(v) / sizeof(char)) - 1), n)
 
 static void new_localvar(LexState *ls, String *name, int n) {
   FuncState *fs = ls->fs;
@@ -212,7 +212,7 @@ static size_t createUpvalue(FuncState *fs, String *name, const ExprInfo *v) {
     f->upvalues[oldSize++] = nullptr;
   }
   f->upvalues[f->upvaluesNum] = name;
-  luaC_objbarrier(fs->L, f, name);
+  GC_objbarrier(fs->L, f, name);
   fs->upvalues[f->upvaluesNum] = rhs;
   return f->upvaluesNum++;
 }
@@ -280,7 +280,7 @@ static void adjust_assign(LexState *ls, int nvars, int nexps, ExprInfo *e) {
     // Last expression provides the difference.
     Codegen_setReturnMulti(fs, e, extra);
     if (extra > 1) {
-      luaK_reserveRegs(fs, extra - 1);
+      Codegen_reserveRegs(fs, extra - 1);
     }
   } else {
     if (e->k != EXPR_VOID) {
@@ -288,7 +288,7 @@ static void adjust_assign(LexState *ls, int nvars, int nexps, ExprInfo *e) {
     }
     if (extra > 0) {
       int reg = fs->freereg;
-      luaK_reserveRegs(fs, extra);
+      Codegen_reserveRegs(fs, extra);
       Codegen_emitNil(fs, reg, extra);
     }
   }
@@ -337,7 +337,7 @@ static void pushclosure(LexState *ls, FuncState *func, ExprInfo *v) {
     f->inners[oldSize++] = nullptr;
   }
   f->inners[fs->np++] = func->f;
-  luaC_objbarrier(ls->L, f, func->f);
+  GC_objbarrier(ls->L, f, func->f);
   exprSetKind(v, EXPR_RELOC);
   v->u.relocatePC = Codegen_emitABx(fs, OP_CLOSURE, 0, fs->np - 1);
   for (size_t i = 0; i < func->f->upvaluesNum; i++) {
@@ -396,7 +396,7 @@ static void closeFunc(LexState *ls) {
   f->locVarsSize = fs->nlocvars;
   Mem_reallocVec(L, f->upvalues, f->upvaluesSize, f->upvaluesNum, String *);
   f->upvaluesSize = f->upvaluesNum;
-  assert(luaG_checkcode(f));
+  assert(Error_checkCode(f));
   assert(fs->bl == nullptr);
   ls->fs = fs->prev;
   /* last token read was anchored in defunct function; must re-anchor it */
@@ -482,7 +482,7 @@ static void closelistfield(FuncState *fs, struct ConsControl *cc) {
   cc->v.k = EXPR_VOID;
   if (cc->tostore == LFIELDS_PER_FLUSH) {
     assert(cc->t->k == EXPR_NON_RELOC);
-    luaK_setlist(fs, cc->t->u.nonRelocReg, cc->na, cc->tostore); /* flush */
+    Codegen_setList(fs, cc->t->u.nonRelocReg, cc->na, cc->tostore); /* flush */
     cc->tostore = 0; /* no more items pending */
   }
 }
@@ -494,17 +494,17 @@ static void lastlistfield(FuncState *fs, struct ConsControl *cc) {
   if (HAS_MULTI_RETURN(cc->v.k)) {
     Codegen_setReturnMulti(fs, &cc->v, LUA_MULTRET);
     // FIXME(anqur): Suspicious conversion.
-    luaK_setlist(fs,
-                 cc->v.k == EXPR_CALL ? (int)cc->t->u.callPC
-                                      : (int)cc->t->u.varargCallPC,
-                 cc->na, LUA_MULTRET);
+    Codegen_setList(fs,
+                    cc->v.k == EXPR_CALL ? (int)cc->t->u.callPC
+                                         : (int)cc->t->u.varargCallPC,
+                    cc->na, LUA_MULTRET);
     cc->na--; /* do not count last expression (unknown number of elements) */
   } else {
     if (cc->v.k != EXPR_VOID) {
       Codegen_exprToNextReg(fs, &cc->v);
     }
     assert(cc->t->k == EXPR_NON_RELOC);
-    luaK_setlist(fs, cc->t->u.nonRelocReg, cc->na, cc->tostore);
+    Codegen_setList(fs, cc->t->u.nonRelocReg, cc->na, cc->tostore);
   }
 }
 
@@ -556,8 +556,8 @@ static void constructor(LexState *ls, ExprInfo *t) {
   } while (testNext(ls, ',') || testNext(ls, ';'));
   check_match(ls, '}', '{', line);
   lastlistfield(fs, &cc);
-  SETARG_B(fs->f->code[pc], luaO_int2fb(cc.na)); /* set initial array size */
-  SETARG_C(fs->f->code[pc], luaO_int2fb(cc.nh)); /* set initial table size */
+  SETARG_B(fs->f->code[pc], Object_int2fb(cc.na)); /* set initial array size */
+  SETARG_C(fs->f->code[pc], Object_int2fb(cc.nh)); /* set initial table size */
 }
 
 static void parlist(LexState *ls) {
@@ -591,7 +591,7 @@ static void parlist(LexState *ls) {
   }
   adjustlocalvars(ls, nparams);
   f->paramsNum = (uint8_t)(fs->nactvar - (f->varargMode & VARARG_HAS_ARG));
-  luaK_reserveRegs(fs, fs->nactvar); /* reserve register for parameters */
+  Codegen_reserveRegs(fs, fs->nactvar); /* reserve register for parameters */
 }
 
 /// \code
@@ -986,7 +986,7 @@ static void checkConflict(LexState *ls, LExpr *lhs, ExprInfo *v) {
   if (conflict) {
     // Make a copy.
     Codegen_emitABC(fs, OP_MOVE, fs->freereg, v->u.localReg, 0);
-    luaK_reserveRegs(fs, 1);
+    Codegen_reserveRegs(fs, 1);
   }
 }
 
@@ -1112,15 +1112,15 @@ static void forbody(LexState *ls, int base, int line, int nvars, int isnum) {
   int prep, endfor;
   adjustlocalvars(ls, 3); /* control variables */
   checkNext(ls, TK_DO);
-  prep =
-      isnum ? luaK_codeAsBx(fs, OP_FORPREP, base, NO_JUMP) : Codegen_jump(fs);
+  prep = isnum ? Codegen_codeAsBx(fs, OP_FORPREP, base, NO_JUMP)
+               : Codegen_jump(fs);
   enterBlock(fs, &bl, false); /* scope for declared variables */
   adjustlocalvars(ls, nvars);
-  luaK_reserveRegs(fs, nvars);
+  Codegen_reserveRegs(fs, nvars);
   block(ls);
   leaveBlock(fs); /* end of scope for declared variables */
   Codegen_patchTo(fs, prep);
-  endfor = (isnum) ? luaK_codeAsBx(fs, OP_FORLOOP, base, NO_JUMP)
+  endfor = (isnum) ? Codegen_codeAsBx(fs, OP_FORLOOP, base, NO_JUMP)
                    : Codegen_emitABC(fs, OP_TFORLOOP, base, 0, nvars);
   Codegen_fixLine(fs, line); /* pretend that `OP_FOR' starts the loop */
   Codegen_patchList(fs, (isnum ? endfor : Codegen_jump(fs)), prep + 1);
@@ -1142,7 +1142,7 @@ static void fornum(LexState *ls, String *varname, int line) {
     exp1(ls); /* optional step */
   } else {    /* default step = 1 */
     Codegen_emitABx(fs, OP_LOADK, fs->freereg, Codegen_addNumber(fs, 1));
-    luaK_reserveRegs(fs, 1);
+    Codegen_reserveRegs(fs, 1);
   }
   forbody(ls, base, line, 1, 1);
 }
@@ -1233,7 +1233,7 @@ static void localFuncStmt(LexState *ls) {
   new_localvar(ls, checkName(ls), 0);
   exprSetKind(&v, EXPR_LOCAL);
   v.u.localReg = fs->freereg;
-  luaK_reserveRegs(fs, 1);
+  Codegen_reserveRegs(fs, 1);
   adjustlocalvars(ls, 1);
   body(ls, &b, false, ls->linenumber);
   Codegen_storeVar(fs, &v, &b);

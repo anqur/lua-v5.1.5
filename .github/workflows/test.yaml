@@ -18,6 +18,4 @@ jobs:
       - name: Build
         run: make -j $(nproc)
       - name: Run tests
-        run: |
-          cd tests
-          make
+        run: make -C tests

@@ -6,7 +6,7 @@
 #include "object.h"
 #include "state.h"
 
-#define luaD_checkstack(L, n)                                                  \
+#define Stack_checkStack(L, n)                                                 \
   do {                                                                         \
     if ((uint8_t *)L->stackLast - (uint8_t *)L->top <=                         \
         (n) * (int)sizeof(Value)) {                                            \
@@ -18,7 +18,7 @@
 
 #define incr_top(L)                                                            \
   do {                                                                         \
-    luaD_checkstack(L, 1);                                                     \
+    Stack_checkStack(L, 1);                                                    \
     L->top++;                                                                  \
   } while (false)
 
@@ -45,7 +45,7 @@ LUAI_FUNC lua_Status Stack_protectedParse(lua_State *L, ZIO *z,
 LUAI_FUNC void Stack_callHook(lua_State *L, int event, int line);
 LUAI_FUNC PreCallResult Stack_preCall(lua_State *L, StackIndex func,
                                       int nresults);
-LUAI_FUNC void luaD_call(lua_State *L, StackIndex func, int nResults);
+LUAI_FUNC void Stack_call(lua_State *L, StackIndex func, int nResults);
 LUAI_FUNC lua_Status Stack_protectedCall(lua_State *L, ProtectedFunc func,
                                          void *u, ptrdiff_t oldTop,
                                          ptrdiff_t ef);

@@ -99,7 +99,7 @@ LUA_API const char *lua_getlocal(lua_State *L, const lua_Debug *ar, int n) {
   const char *name = findlocal(L, ci, n);
   lua_lock(L);
   if (name) {
-    luaA_pushobject(L, ci->base + (n - 1));
+    API_pushObject(L, ci->base + (n - 1));
   }
   lua_unlock(L);
   return name;
@@ -256,9 +256,9 @@ static int precheck(const Prototype *pt) {
   return 1;
 }
 
-#define checkopenop(pt, pc) luaG_checkopenop((pt)->code[(pc) + 1])
+#define checkopenop(pt, pc) Error_checkOpenOp((pt)->code[(pc) + 1])
 
-int luaG_checkopenop(Instruction i) {
+int Error_checkOpenOp(Instruction i) {
   switch (GET_OPCODE(i)) {
   case OP_CALL:
   case OP_TAILCALL:
@@ -477,7 +477,7 @@ static Instruction symbexec(const Prototype *pt, size_t lastpc, int reg) {
 
 /* }====================================================== */
 
-int luaG_checkcode(const Prototype *pt) {
+int Error_checkCode(const Prototype *pt) {
   return (symbexec(pt, pt->codeSize, NO_REG) != 0);
 }
 
@@ -565,43 +565,43 @@ static int isinstack(CallInfo *ci, const Value *o) {
   return 0;
 }
 
-void luaG_typeerror(lua_State *L, const Value *o, const char *op) {
+void Error_typeError(lua_State *L, const Value *o, const char *op) {
   const char *name = nullptr;
   const char *t = Debug_typeNames[GET_TYPE(o)];
   const char *kind = (isinstack(L->ci, o))
                          ? getobjname(L, L->ci, (int)(o - L->base), &name)
                          : nullptr;
   if (kind) {
-    luaG_runerror(L, "attempt to %s %s '%s' (a %s value)", op, kind, name, t);
+    Error_runError(L, "attempt to %s %s '%s' (a %s value)", op, kind, name, t);
   } else {
-    luaG_runerror(L, "attempt to %s a %s value", op, t);
+    Error_runError(L, "attempt to %s a %s value", op, t);
   }
 }
 
-void luaG_concaterror(lua_State *L, StackIndex p1, StackIndex p2) {
+void Error_concatError(lua_State *L, StackIndex p1, StackIndex p2) {
   if (IS_TYPE_STRING(p1) || IS_TYPE_NUMBER(p1)) {
     p1 = p2;
   }
   assert(!IS_TYPE_STRING(p1) && !IS_TYPE_NUMBER(p1));
-  luaG_typeerror(L, p1, "concatenate");
+  Error_typeError(L, p1, "concatenate");
 }
 
-void luaG_aritherror(lua_State *L, const Value *p1, const Value *p2) {
+void Error_arithmeticError(lua_State *L, const Value *p1, const Value *p2) {
   Value temp;
-  if (luaV_tonumber(p1, &temp) == NULL) {
+  if (VM_toNumber(p1, &temp) == NULL) {
     p2 = p1; /* first operand is wrong */
   }
-  luaG_typeerror(L, p2, "perform arithmetic on");
+  Error_typeError(L, p2, "perform arithmetic on");
 }
 
-[[noreturn]] void luaG_ordererror(lua_State *L, const Value *p1,
-                                  const Value *p2) {
+[[noreturn]] void Error_orderError(lua_State *L, const Value *p1,
+                                   const Value *p2) {
   const char *t1 = Debug_typeNames[GET_TYPE(p1)];
   const char *t2 = Debug_typeNames[GET_TYPE(p2)];
   if (t1[2] == t2[2]) {
-    luaG_runerror(L, "attempt to compare two %s values", t1);
+    Error_runError(L, "attempt to compare two %s values", t1);
   } else {
-    luaG_runerror(L, "attempt to compare %s with %s", t1, t2);
+    Error_runError(L, "attempt to compare %s with %s", t1, t2);
   }
 }
 
@@ -615,7 +615,7 @@ static void addinfo(lua_State *L, const char *msg) {
   }
 }
 
-[[noreturn]] void luaG_errormsg(lua_State *L) {
+[[noreturn]] void Error_errorMsg(lua_State *L) {
   if (L->errFunc != 0) { /* is there an error handling function? */
     StackIndex errfunc = RESTORE_STACK(L, L->errFunc);
     if (!IS_TYPE_FUNCTION(errfunc)) {
@@ -624,20 +624,20 @@ static void addinfo(lua_State *L, const char *msg) {
     SET_OBJECT_TO_SAME_STACK(L, L->top, L->top - 1);  /* move argument */
     SET_OBJECT_TO_SAME_STACK(L, L->top - 1, errfunc); /* push function */
     incr_top(L);
-    luaD_call(L, L->top - 2, 1); /* call it */
+    Stack_call(L, L->top - 2, 1); /* call it */
   }
   Stack_throw(L, LUA_ERRRUN);
 }
 
-[[noreturn]] void luaG_runerror(lua_State *L, const char *fmt, ...) {
+[[noreturn]] void Error_runError(lua_State *L, const char *fmt, ...) {
   va_list argp;
   va_start(argp, fmt);
   addinfo(L, Object_vsprintf(L, fmt, argp));
   va_end(argp);
-  luaG_errormsg(L);
+  Error_errorMsg(L);
 }
 
-void luaA_pushobject(lua_State *L, const Value *o) {
+void API_pushObject(lua_State *L, const Value *o) {
   SET_OBJECT_TO_STACK(L, L->top, o);
   API_CHECK(L, L->top < L->ci->top);
   L->top++;

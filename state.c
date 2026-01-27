@@ -53,7 +53,7 @@ static void initWithHeap(lua_State *L, void *) {
   SET_TABLE(L, GLOBALS(L), Table_new(L, 0, 2));
   SET_TABLE(L, REGISTRY(L), Table_new(L, 0, 2));
   StringPool_resize(L, MINSTRTABSIZE);
-  luaT_init(L);
+  Tag_init(L);
   Lexer_init(L);
   String_intern(String_createLiteral(L, MEMERRMSG));
   g->GCthreshold = 4 * g->totalbytes;
@@ -86,7 +86,7 @@ static void closeState(lua_State *L) {
   // Close all upvalues for this thread.
   Closure_close(L, L->stack);
   // Collect all objects.
-  luaC_freeall(L);
+  GC_freeAll(L);
   assert(g->rootgc == LuaObjectToGCObject(L));
   assert(g->pool.itemsNum == 0);
   Mem_freeVec(L, G(L)->pool.buckets, G(L)->pool.bucketsSize, String *);
@@ -98,7 +98,7 @@ static void closeState(lua_State *L) {
 
 lua_State *State_newThread(lua_State *L) {
   lua_State *L1 = TO_STATE(Mem_alloc(L, STATE_SIZE(lua_State)));
-  luaC_link(L, LuaObjectToGCObject(L1), LUA_TYPE_THREAD);
+  GC_link(L, LuaObjectToGCObject(L1), LUA_TYPE_THREAD);
   initPartialState(L1, G(L));
   initStack(L1, L);
   // Share the table of global variables.
@@ -130,7 +130,7 @@ LUA_API lua_State *lua_newstate(lua_Alloc f, void *allocData) {
   L->header.next = nullptr;
   L->header.tt = LUA_TYPE_THREAD;
   g->currentwhite = bit2mask(WHITE0BIT, FIXEDBIT);
-  L->header.marked = luaC_white(g);
+  L->header.marked = GC_white(g);
   set2bits(L->header.marked, FIXEDBIT, SFIXEDBIT);
   initPartialState(L, g);
   g->alloc = f;
@@ -172,14 +172,14 @@ LUA_API lua_State *lua_newstate(lua_Alloc f, void *allocData) {
 }
 
 static void callGcTm(lua_State *L, void *) {
-  luaC_callGCTM(L); /* call GC metamethods for all udata */
+  GC_callGCTM(L); /* call GC metamethods for all udata */
 }
 
 LUA_API void lua_close(lua_State *L) {
   L = G(L)->mainthread; /* only the main thread can be closed */
   lua_lock(L);
   Closure_close(L, L->stack); /* close all upvalues for this thread */
-  luaC_separateudata(L, 1);   /* separate udata that have GC metamethods */
+  GC_separateUserdata(L, 1);  /* separate udata that have GC metamethods */
   L->errFunc = 0;             /* no error function during GC metamethods */
   do {                        /* repeat until no more errors */
     L->ci = L->baseCI;

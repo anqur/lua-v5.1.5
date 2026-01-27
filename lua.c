@@ -58,11 +58,19 @@
 ** CHANGE them if you want to improve this functionality (e.g., by using
 ** GNU readline and history facilities).
 */
-#define lua_readline(L,b,p)	\
-	((void)L, fputs(p, stdout), fflush(stdout),  /* show prompt */ \
-	fgets(b, LUA_MAXINPUT, stdin) != NULL)  /* get line */
-#define lua_saveline(L,idx)	{ (void)L; (void)idx; }
-#define lua_freeline(L,b)	{ (void)L; (void)b; }
+#define lua_readline(L, b, p)                                                  \
+  ((void)L, fputs(p, stdout), fflush(stdout), /* show prompt */                \
+   fgets(b, LUA_MAXINPUT, stdin) != NULL)     /* get line */
+#define lua_saveline(L, idx)                                                   \
+  {                                                                            \
+    (void)L;                                                                   \
+    (void)idx;                                                                 \
+  }
+#define lua_freeline(L, b)                                                     \
+  {                                                                            \
+    (void)L;                                                                   \
+    (void)b;                                                                   \
+  }
 
 /* }================================================================== */
 

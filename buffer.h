@@ -31,7 +31,8 @@ typedef struct StringBuilder {
 #define StringBuilder_free(L, b) StringBuilder_resize(L, b, 0)
 
 #define EOZ (-1) /* end of stream */
-#define READ_CHAR(z) (((z)->n--) > 0 ? (int)(uint8_t)*(z)->p++ : luaZ_fill(z))
+#define READ_CHAR(z)                                                           \
+  (((z)->n--) > 0 ? (int)(uint8_t) * (z)->p++ : Buffer_fill(z))
 
 typedef struct Zio {
   // Number of bytes still unread.
@@ -44,10 +45,10 @@ typedef struct Zio {
   lua_State *L;
 } ZIO;
 
-LUAI_FUNC char *luaZ_reserve(lua_State *L, StringBuilder *buff, size_t n);
-LUAI_FUNC void luaZ_init(lua_State *L, ZIO *z, lua_Reader reader, void *ud);
+LUAI_FUNC char *Buffer_reserve(lua_State *L, StringBuilder *buff, size_t n);
+LUAI_FUNC void Buffer_init(lua_State *L, ZIO *z, lua_Reader reader, void *ud);
 // Read next n bytes.
-LUAI_FUNC size_t luaZ_read(ZIO *z, void *b, size_t n);
-LUAI_FUNC int luaZ_lookahead(ZIO *z);
+LUAI_FUNC size_t Buffer_read(ZIO *z, void *b, size_t n);
+LUAI_FUNC int Buffer_lookahead(ZIO *z);
 
-LUAI_FUNC int luaZ_fill(ZIO *z);
+LUAI_FUNC int Buffer_fill(ZIO *z);

@@ -325,13 +325,13 @@ typedef struct Table {
 
 LUAI_DATA const Value valueNil;
 
-#define ceillog2(x) (luaO_log2((x) - 1) + 1)
+#define ceillog2(x) (Object_log2((x) - 1) + 1)
 
-LUAI_FUNC int luaO_log2(unsigned int x);
-LUAI_FUNC int luaO_int2fb(unsigned int x);
-LUAI_FUNC int luaO_fb2int(int x);
+LUAI_FUNC int Object_log2(unsigned int x);
+LUAI_FUNC int Object_int2fb(unsigned int x);
+LUAI_FUNC int Object_fb2int(int x);
 LUAI_FUNC bool Object_rawEqual(const Value *t1, const Value *t2);
-LUAI_FUNC int luaO_str2d(const char *s, double *result);
+LUAI_FUNC int Object_str2d(const char *s, double *result);
 LUAI_FUNC const char *Object_vsprintf(lua_State *L, const char *fmt,
                                       va_list argp);
 LUAI_FUNC const char *Object_sprintf(lua_State *L, const char *fmt, ...);

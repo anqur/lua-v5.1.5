@@ -138,7 +138,7 @@ static CallInfo *growCI(lua_State *L) {
   } else {
     Stack_resizeCI(L, 2 * L->ciSize);
     if (L->ciSize > LUAI_MAXCALLS) {
-      luaG_runerror(L, "stack overflow");
+      Error_runError(L, "stack overflow");
     }
   }
   return ++L->ci;
@@ -157,7 +157,7 @@ void Stack_callHook(lua_State *L, int event, int line) {
       // No debug information for tail calls.
       .i_ci = event == LUA_HOOKTAILRET ? 0 : (int)(L->ci - L->baseCI),
   };
-  luaD_checkstack(L, LUA_MIN_STACK); /* ensure minimum stack size */
+  Stack_checkStack(L, LUA_MIN_STACK); /* ensure minimum stack size */
   L->ci->top = L->top + LUA_MIN_STACK;
   assert(L->ci->top <= L->stackLast);
   L->allowHook = false; /* cannot call hooks inside a hook */
@@ -182,8 +182,8 @@ static StackIndex adjustVarargs(lua_State *L, Prototype *p, int actual) {
   if (p->varargMode & VARARG_NEEDS_ARG) {
     int extraArgs = actual - fixedArgs;
     assert(p->varargMode & VARARG_HAS_ARG);
-    luaC_checkGC(L);
-    luaD_checkstack(L, p->maxStackSize);
+    GC_checkGC(L);
+    Stack_checkStack(L, p->maxStackSize);
     argTable = Table_new(L, extraArgs, 1);
     for (int i = 0; i < extraArgs; i++) {
       // Put extra arguments into the `arg` table.
@@ -211,10 +211,10 @@ static StackIndex adjustVarargs(lua_State *L, Prototype *p, int actual) {
 }
 
 static StackIndex tryFuncTM(lua_State *L, StackIndex func) {
-  const Value *tm = luaT_gettmbyobj(L, func, TM_CALL);
+  const Value *tm = Tag_getTMByObj(L, func, TM_CALL);
   ptrdiff_t funcr = SAVE_STACK(L, func);
   if (!IS_TYPE_FUNCTION(tm)) {
-    luaG_typeerror(L, func, "call");
+    Error_typeError(L, func, "call");
   }
   // Open a hole inside the stack at `func`.
   for (StackIndex p = L->top; p > func; p--) {
@@ -243,7 +243,7 @@ PreCallResult Stack_preCall(lua_State *L, StackIndex func, int nresults) {
 
   if (!cl->header.isC) {
     Prototype *p = cl->p;
-    luaD_checkstack(L, p->maxStackSize);
+    Stack_checkStack(L, p->maxStackSize);
     func = RESTORE_STACK(L, funcr);
     StackIndex base;
     if (!p->varargMode) { /* no varargs? */
@@ -282,7 +282,7 @@ PreCallResult Stack_preCall(lua_State *L, StackIndex func, int nresults) {
   }
 
   // It is a C function, just call it.
-  luaD_checkstack(L, LUA_MIN_STACK);
+  Stack_checkStack(L, LUA_MIN_STACK);
   // Now enter the new function.
   CallInfo *ci = INC_CI(L);
   ci->func = RESTORE_STACK(L, funcr);
@@ -347,10 +347,10 @@ int Stack_postCall(lua_State *L, StackIndex firstResult) {
 ** When returns, all the results are on the stack, starting at the original
 ** function position.
 */
-void luaD_call(lua_State *L, StackIndex func, int nResults) {
+void Stack_call(lua_State *L, StackIndex func, int nResults) {
   if (++L->nestedCCallsNum >= LUAI_MAX_C_CALLS) {
     if (L->nestedCCallsNum == LUAI_MAX_C_CALLS) {
-      luaG_runerror(L, "C stack overflow");
+      Error_runError(L, "C stack overflow");
     } else if (L->nestedCCallsNum >=
                (LUAI_MAX_C_CALLS + (LUAI_MAX_C_CALLS >> 3))) {
       // Error while handing stack error.
@@ -358,10 +358,10 @@ void luaD_call(lua_State *L, StackIndex func, int nResults) {
     }
   }
   if (Stack_preCall(L, func, nResults) == PCR_LUA_READY) {
-    luaV_execute(L, 1);
+    VM_execute(L, 1);
   }
   L->nestedCCallsNum--;
-  luaC_checkGC(L);
+  GC_checkGC(L);
 }
 
 static void resume(lua_State *L, void *ud) {
@@ -389,7 +389,7 @@ static void resume(lua_State *L, void *ud) {
       L->base = L->ci->base;
     }
   }
-  luaV_execute(L, (int)(L->ci - L->baseCI));
+  VM_execute(L, (int)(L->ci - L->baseCI));
 }
 
 static int resumeError(lua_State *L, const char *msg) {
@@ -430,7 +430,7 @@ LUA_API int lua_yield(lua_State *L, int nresults) {
   luai_userstateyield(L, nresults);
   lua_lock(L);
   if (L->nestedCCallsNum > L->nestedCCallsBaseNum) {
-    luaG_runerror(L, "attempt to yield across metamethod/C-call boundary");
+    Error_runError(L, "attempt to yield across metamethod/C-call boundary");
   }
   // Protect stack slots below.
   L->base = L->top - nresults;
@@ -474,8 +474,8 @@ struct SParser {
 
 static void doParse(lua_State *L, void *ud) {
   struct SParser *p = ud;
-  int c = luaZ_lookahead(p->z);
-  luaC_checkGC(L);
+  int c = Buffer_lookahead(p->z);
+  GC_checkGC(L);
   Prototype *tf = (c == LUA_SIGNATURE[0] ? luaU_undump : luaY_parser)(
       L, p->z, &p->buff, p->name);
   Closure *cl = Closure_newL(L, tf->upvaluesNum, TABLE_VALUE(GLOBALS(L)));

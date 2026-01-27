@@ -5,7 +5,7 @@
 #include "memory.h"
 #include "state.h"
 
-int luaZ_fill(ZIO *z) {
+int Buffer_fill(ZIO *z) {
   lua_State *L = z->L;
   lua_unlock(L);
   // Enter the userspace, so we unlock first.
@@ -20,19 +20,19 @@ int luaZ_fill(ZIO *z) {
   return (int)(uint8_t)*z->p++;
 }
 
-int luaZ_lookahead(ZIO *z) {
+int Buffer_lookahead(ZIO *z) {
   if (z->n == 0) {
-    if (luaZ_fill(z) == EOZ) {
+    if (Buffer_fill(z) == EOZ) {
       return EOZ;
     }
-    // luaZ_fill removed first byte, put it back.
+    // Buffer_fill removed first byte, put it back.
     z->n++;
     z->p--;
   }
   return (int)(uint8_t)*z->p;
 }
 
-void luaZ_init(lua_State *L, ZIO *z, lua_Reader reader, void *ud) {
+void Buffer_init(lua_State *L, ZIO *z, lua_Reader reader, void *ud) {
   z->L = L;
   z->reader = reader;
   z->ud = ud;
@@ -40,10 +40,10 @@ void luaZ_init(lua_State *L, ZIO *z, lua_Reader reader, void *ud) {
   z->p = nullptr;
 }
 
-size_t luaZ_read(ZIO *z, void *b, size_t n) {
+size_t Buffer_read(ZIO *z, void *b, size_t n) {
   uint8_t *bytes = b;
   while (n) {
-    if (luaZ_lookahead(z) == EOZ) {
+    if (Buffer_lookahead(z) == EOZ) {
       // Return number of missing bytes.
       return n;
     }
@@ -57,7 +57,7 @@ size_t luaZ_read(ZIO *z, void *b, size_t n) {
   return 0;
 }
 
-char *luaZ_reserve(lua_State *L, StringBuilder *buff, size_t n) {
+char *Buffer_reserve(lua_State *L, StringBuilder *buff, size_t n) {
   if (n > buff->size) {
     if (n < LUA_MIN_BUF_SIZE) {
       n = LUA_MIN_BUF_SIZE;

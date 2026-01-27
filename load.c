@@ -20,12 +20,12 @@ static void error(LoadState *S, const char *why) {
 }
 
 #define LoadMem(S, b, n, size) LoadBlock(S, b, (n) * (size))
-#define LoadByte(S) (uint8_t)LoadChar(S)
+#define LoadByte(S) (uint8_t) LoadChar(S)
 #define LoadVar(S, x) LoadMem(S, &x, 1, sizeof(x))
 #define LoadVector(S, b, n, size) LoadMem(S, b, n, size)
 
 static void LoadBlock(LoadState *S, void *b, size_t size) {
-  size_t r = luaZ_read(S->Z, b, size);
+  size_t r = Buffer_read(S->Z, b, size);
   if (r != 0) {
     error(S, "unexpected end");
   }
@@ -58,7 +58,7 @@ static String *LoadString(LoadState *S) {
   if (size == 0) {
     return nullptr;
   }
-  char *s = luaZ_reserve(S->L, S->b, size);
+  char *s = Buffer_reserve(S->L, S->b, size);
   LoadBlock(S, s, size);
   return String_createSized(S->L, s, size - 1); /* remove trailing '\0' */
 }
@@ -161,7 +161,7 @@ static Prototype *LoadFunction(LoadState *S, String *p) {
   LoadCode(S, f);
   LoadConstants(S, f);
   LoadDebug(S, f);
-  if (!luaG_checkcode(f)) {
+  if (!Error_checkCode(f)) {
     error(S, "bad code");
   }
   S->L->top--;
