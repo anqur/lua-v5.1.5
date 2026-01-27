@@ -1,10 +1,9 @@
-# FIXME(anqur): I have to use this to suppress IDE warnings, forgive me.
-CC = /opt/homebrew/opt/llvm/bin/clang
+CC = clang
 CFLAGS = -std=c23 \
 	-g -O2 \
 	-fsanitize=address \
-	-Werror -Wall -Wextra -Wpedantic \
-	-DLUA_USER_H='"tests.h"'
+	-Werror -Wall -Wextra -Wpedantic -Wno-gnu-binary-literal \
+	-D_GNU_SOURCE -DLUA_USER_H='"tests.h"'
 AR = ar rcu
 RANLIB = ranlib
 RM = rm -f

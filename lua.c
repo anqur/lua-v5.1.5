@@ -58,6 +58,7 @@
 ** CHANGE them if you want to improve this functionality (e.g., by using
 ** GNU readline and history facilities).
 */
+#include <readline/readline.h>
 #include <readline/history.h>
 #define lua_readline(L, b, p) ((void)L, ((b) = readline(p)) != NULL)
 #define lua_saveline(L, idx)                                                   \
