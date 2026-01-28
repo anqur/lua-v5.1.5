@@ -105,8 +105,8 @@ static String *checkName(LexState *ls) {
 }
 
 static void exprSetKind(ExprInfo *e, ExprKind k) {
-  e->f = NO_JUMP;
-  e->t = NO_JUMP;
+  e->elseBranch = NO_JUMP;
+  e->thenBranch = NO_JUMP;
   e->k = k;
 }
 
@@ -1034,7 +1034,7 @@ static int cond(LexState *ls) {
     v.k = EXPR_FALSE; /* `falses' are all equal here */
   }
   Codegen_goIfTrue(ls->fs, &v);
-  return v.f;
+  return v.elseBranch;
 }
 
 static void breakStmt(LexState *ls) {
@@ -1207,9 +1207,8 @@ static void ifStmt(LexState *ls, int line) {
   /* ifStmt -> IF cond THEN block {ELSEIF cond THEN block} [ELSE block] END
    */
   FuncState *fs = ls->fs;
-  int flist;
+  int flist = test_then_block(ls); /* IF cond THEN block */
   int escapelist = NO_JUMP;
-  flist = test_then_block(ls); /* IF cond THEN block */
   while (ls->t.token == TK_ELSEIF) {
     Codegen_concat(fs, &escapelist, Codegen_jump(fs));
     Codegen_patchTo(fs, flist);

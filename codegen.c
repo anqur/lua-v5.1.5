@@ -8,10 +8,10 @@
 #include "parser.h"
 #include "table.h"
 
-#define HAS_JUMPS(e) ((e)->t != (e)->f)
+#define HAS_JUMPS(e) ((e)->thenBranch != (e)->elseBranch)
 
 static int isNumeric(ExprInfo *e) {
-  return e->k == EXPR_CONST_NUM && e->t == NO_JUMP && e->f == NO_JUMP;
+  return e->k == EXPR_CONST_NUM && e->thenBranch == NO_JUMP && e->elseBranch == NO_JUMP;
 }
 
 void Codegen_emitNil(FuncState *fs, int from, int n) {
@@ -365,27 +365,51 @@ static void releaseToAnyReg(FuncState *fs, ExprInfo *e) {
 }
 
 static void exprToReg(FuncState *fs, ExprInfo *e, int reg) {
+  /* Ensure expression value is placed (or emitted) into `reg`. */
   releaseToReg(fs, e, reg);
   if (e->k == EXPR_JMP) {
-    // FIXME(anqur): Suspicious conversion.
-    Codegen_concat(fs, &e->t, (int)e->u.jmpPC); /* put this jump in `t' list */
+    /*
+     FIXME(anqur): Suspicious conversion.
+     When `e` is a jump expression, `e->u.jmpPC` holds the program
+     counter (PC) of the last emitted jump for this expression. That
+     jump should be appended to the `thenBranch` (true) list so it will be
+     patched/handled together with other true-branch jumps.
+    */
+    Codegen_concat(fs, &e->thenBranch, (int)e->u.jmpPC); /* put this jump in `thenBranch' list */
   }
+
   if (HAS_JUMPS(e)) {
-    ptrdiff_t p_f = NO_JUMP; /* position of an eventual LOAD false */
-    ptrdiff_t p_t = NO_JUMP; /* position of an eventual LOAD true */
-    if (needValue(fs, e->t) || needValue(fs, e->f)) {
-      int fj = e->k == EXPR_JMP ? NO_JUMP : Codegen_jump(fs);
-      p_f = emitLabel(fs, reg, 0, 1);
-      p_t = emitLabel(fs, reg, 1, 0);
-      Codegen_patchTo(fs, fj);
+    /*
+     If the expression has conditional jumps (true/false lists), we may
+     need to emit actual LOADBOOL instructions to produce a concrete
+     boolean value in `reg` for those paths. `loadFalsePos` and
+     `loadTruePos` store the PC of those potential LOADBOOLs (or
+     NO_JUMP if none were emitted).
+    */
+    ptrdiff_t loadFalsePos = NO_JUMP; /* position of an eventual LOAD false */
+    ptrdiff_t loadTruePos = NO_JUMP;  /* position of an eventual LOAD true */
+
+    if (needValue(fs, e->thenBranch) || needValue(fs, e->elseBranch)) {
+      /*
+       If either path needs a concrete value, reserve a jump to
+       separate the boolean loaders from the previous code. `pendingJmp`
+       represents a jump to be patched to the loaders.
+      */
+      int pendingJmp = e->k == EXPR_JMP ? NO_JUMP : Codegen_jump(fs);
+      loadFalsePos = emitLabel(fs, reg, 0, 1);
+      loadTruePos = emitLabel(fs, reg, 1, 0);
+      Codegen_patchTo(fs, pendingJmp);
     }
-    // Position after whole expression.
-    ptrdiff_t final = (ptrdiff_t)Codegen_getLabel(fs);
-    patchListAux(fs, e->f, final, reg, p_f);
-    patchListAux(fs, e->t, final, reg, p_t);
+
+    /* Position after whole expression; all lists should target this. */
+    ptrdiff_t afterExpr = (ptrdiff_t)Codegen_getLabel(fs);
+    patchListAux(fs, e->elseBranch, afterExpr, reg, loadFalsePos);
+    patchListAux(fs, e->thenBranch, afterExpr, reg, loadTruePos);
   }
-  e->f = NO_JUMP;
-  e->t = NO_JUMP;
+
+  /* Normalize expression state: no pending jumps and value now in `reg`. */
+  e->elseBranch = NO_JUMP;
+  e->thenBranch = NO_JUMP;
   e->u.nonRelocReg = reg;
   e->k = EXPR_NON_RELOC;
 }
@@ -535,10 +559,10 @@ void Codegen_goIfTrue(FuncState *fs, ExprInfo *e) {
     pc = jumpOnCond(fs, e, 0);
     break;
   }
-  // Insert last jump in 'f' list.
-  Codegen_concat(fs, &e->f, pc);
-  Codegen_patchTo(fs, e->t);
-  e->t = NO_JUMP;
+  // Insert last jump in 'elseBranch' list.
+  Codegen_concat(fs, &e->elseBranch, pc);
+  Codegen_patchTo(fs, e->thenBranch);
+  e->thenBranch = NO_JUMP;
 }
 
 static void Codegen_goIfFalse(FuncState *fs, ExprInfo *e) {
@@ -558,10 +582,10 @@ static void Codegen_goIfFalse(FuncState *fs, ExprInfo *e) {
     pc = jumpOnCond(fs, e, 1);
     break;
   }
-  // Insert last jump in 't' list.
-  Codegen_concat(fs, &e->t, pc);
-  Codegen_patchTo(fs, e->f);
-  e->f = NO_JUMP;
+  // Insert last jump in 'thenBranch' list.
+  Codegen_concat(fs, &e->thenBranch, pc);
+  Codegen_patchTo(fs, e->elseBranch);
+  e->elseBranch = NO_JUMP;
 }
 
 static void emitNot(FuncState *fs, ExprInfo *e) {
@@ -598,12 +622,12 @@ static void emitNot(FuncState *fs, ExprInfo *e) {
   }
 
   {
-    int falseList = e->f;
-    e->f = e->t;
-    e->t = falseList;
+    int falseList = e->elseBranch;
+    e->elseBranch = e->thenBranch;
+    e->thenBranch = falseList;
   }
-  removeValues(fs, e->f);
-  removeValues(fs, e->t);
+  removeValues(fs, e->elseBranch);
+  removeValues(fs, e->thenBranch);
 }
 
 void Codegen_indexed(FuncState *fs, ExprInfo *t, ExprInfo *k) {
@@ -698,7 +722,7 @@ static void codeComp(FuncState *fs, OpCode op, int cond, ExprInfo *e1,
 }
 
 void Codegen_prefix(FuncState *fs, OpKind op, ExprInfo *a) {
-  ExprInfo b = {.t = NO_JUMP, .f = NO_JUMP, .k = EXPR_CONST_NUM};
+  ExprInfo b = {.thenBranch = NO_JUMP, .elseBranch = NO_JUMP, .k = EXPR_CONST_NUM};
   switch (op) {
   case OPR_MINUS:
     if (!isNumeric(a)) {
@@ -754,16 +778,16 @@ void Codegen_suffix(FuncState *fs, OpKind op, ExprInfo *e1, ExprInfo *e2) {
   switch (op) {
   case OPR_AND:
     // List must be closed.
-    assert(e1->t == NO_JUMP);
+    assert(e1->thenBranch == NO_JUMP);
     Codegen_releaseVars(fs, e2);
-    Codegen_concat(fs, &e2->f, e1->f);
+    Codegen_concat(fs, &e2->elseBranch, e1->elseBranch);
     *e1 = *e2;
     break;
   case OPR_OR:
     // List must be closed.
-    assert(e1->f == NO_JUMP);
+    assert(e1->elseBranch == NO_JUMP);
     Codegen_releaseVars(fs, e2);
-    Codegen_concat(fs, &e2->t, e1->t);
+    Codegen_concat(fs, &e2->thenBranch, e1->thenBranch);
     *e1 = *e2;
     break;
   case OPR_CONCAT:

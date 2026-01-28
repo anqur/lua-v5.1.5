@@ -25,4 +25,4 @@ make -C tests
 
 ## License
 
-MIT.
+MIT

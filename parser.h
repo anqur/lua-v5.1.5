@@ -62,8 +62,8 @@ typedef union ExprVariant {
 typedef struct ExprInfo {
   ExprKind k;
   ExprVariant u;
-  int t; /* patch list of `exit when true' */
-  int f; /* patch list of `exit when false' */
+  int thenBranch; /* patch list of `exit when true' */
+  int elseBranch; /* patch list of `exit when false' */
 } ExprInfo;
 
 typedef union UpvalueVariant {
